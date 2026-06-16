@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Salto Auto-Programmer",
+  "version": "1.0",
+  "description": "Automates Salto card programming from CSV/XLSX rosters.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://saltoprd.american.edu/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Open Salto Programmer"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://saltoprd.american.edu/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
