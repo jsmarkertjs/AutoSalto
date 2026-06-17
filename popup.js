@@ -9,7 +9,7 @@ function getOrdinal(n) {
 function formatDate(dateInput) {
     if (!dateInput) return "";
     let d = new Date(dateInput);
-    if (isNaN(d.getTime())) return dateInput; // Fallback to original if parsing fails
+    if (isNaN(d.getTime())) return dateInput; 
 
     let mm = String(d.getMonth() + 1).padStart(2, '0');
     let dd = String(d.getDate()).padStart(2, '0');
@@ -18,24 +18,14 @@ function formatDate(dateInput) {
     return `${mm}-${dd}-${yyyy}`;
 }
 
-// Function to route exact building formatting
+// Function to route exact building dropdown formatting
 function getAccessLevelSearch(bldgAbbr, floorDigit, roomSuffixInt) {
     let floorOrdinal = getOrdinal(parseInt(floorDigit));
     let bldgUpper = bldgAbbr.toUpperCase();
 
     switch(bldgUpper) {
-        case "AND":
-            if (roomSuffixInt >= 21 && roomSuffixInt <= 58) {
-                return `Anderson Hall ${floorOrdinal} Floor North`;
-            } else {
-                return `Anderson Hall ${floorOrdinal} Floor South`;
-            }
-        case "LETT":
-            if (roomSuffixInt >= 25 && roomSuffixInt <= 48) {
-                return `Letts Hall - ${floorOrdinal} Floor South`;
-            } else {
-                return `Letts Hall - ${floorOrdinal} Floor North`;
-            }
+        case "AND": return roomSuffixInt >= 21 && roomSuffixInt <= 58 ? `Anderson Hall ${floorOrdinal} Floor North` : `Anderson Hall ${floorOrdinal} Floor South`;
+        case "LETT": return roomSuffixInt >= 25 && roomSuffixInt <= 48 ? `Letts Hall - ${floorOrdinal} Floor South` : `Letts Hall - ${floorOrdinal} Floor North`;
         case "CSSL": return `Cassell Hall ${floorDigit}`;
         case "CENT": return `Centennial Hall ${floorDigit}`;
         case "CLRK": return `Clark Hall ${floorDigit}`;
@@ -45,8 +35,25 @@ function getAccessLevelSearch(bldgAbbr, floorDigit, roomSuffixInt) {
         case "HUGH": return `Hughes Hall ${floorDigit}`;
         case "LEO":  return `Leonard Hall ${floorDigit}`;
         case "MCD":  return `McDowell Hall ${floorDigit}`;
-        default:
-            return `${bldgUpper} ${floorDigit}`; // Fallback if building isn't mapped
+        default: return `${bldgUpper} ${floorDigit}`; 
+    }
+}
+
+// NEW: Function to translate "AND" to "Anderson" for the Checkbox label
+function getCheckboxBuildingName(abbr) {
+    switch(abbr.toUpperCase()) {
+        case "AND": return "Anderson";
+        case "LETT": return "Letts";
+        case "CSSL": return "Cassell";
+        case "CENT": return "Centennial";
+        case "CLRK": return "Clark";
+        case "CNST": return "Constitution";
+        case "DBR": return "Duber";
+        case "FDRL": return "Federal";
+        case "HUGH": return "Hughes";
+        case "LEO": return "Leonard";
+        case "MCD": return "McDowell";
+        default: return abbr;
     }
 }
 
@@ -72,13 +79,11 @@ document.getElementById('startBtn').addEventListener('click', () => {
         const data = e.target.result;
         let parsedRows = [];
 
-        // Determine if CSV or XLSX
         if (file.name.endsWith('.csv')) {
             const results = Papa.parse(data, { header: true, skipEmptyLines: true });
             parsedRows = results.data;
             processData(parsedRows, confName);
         } else if (file.name.endsWith('.xlsx')) {
-            // Added cellDates: true so Excel reads dates correctly instead of as serial numbers
             const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
             const firstSheet = workbook.SheetNames[0];
             parsedRows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
@@ -102,34 +107,30 @@ function processData(rows, confName) {
         let roomDesc = row['Entry Summary Room Space Description'] || "";
         let cardNum = row['Entry Guest Card #'] || "";
         
-        // Format Dates to MM-DD-YYYY immediately 
         let checkIn = formatDate(row['Booking Check In Date']);
         let checkOut = formatDate(row['Booking Check Out Date']);
 
-        // Skip empties or numeric-only names
         if (!first || !isNaN(first)) return;
 
-        // Regex to split room string (e.g., "LETT 401-1")
         const match = roomDesc.match(/([A-Za-z]+)\s*(\d+)/);
         if (match) {
             let bldgAbbr = match[1].toUpperCase();
             let rawRoom = match[2];
 
-            // Math to split the floor from the room suffix (e.g. 421 -> Floor 4, Room 21)
             let floorDigit = rawRoom.length > 2 ? rawRoom.substring(0, rawRoom.length - 2) : "1";
             let roomSuffixStr = rawRoom.length > 2 ? rawRoom.substring(rawRoom.length - 2) : rawRoom;
             let roomSuffixInt = parseInt(roomSuffixStr, 10);
 
-            // Get the exact dropdown string using our new router
             let accessLevelSearch = getAccessLevelSearch(bldgAbbr, floorDigit, roomSuffixInt);
+            let checkboxBldgName = getCheckboxBuildingName(bldgAbbr);
 
-            // Build the final physical label string
             let fullString = `${cardNum}, ${first} ${last}, ${roomDesc}, ${confName}, ${checkIn}-${checkOut}`;
 
             formattedCards.push({
                 full_string: fullString,
                 access_level_search: accessLevelSearch,
-                room_checkbox_label: `${bldgAbbr} ${rawRoom}`,
+                // THIS FIXES THE TEXT MISMATCH (e.g., "Anderson 214")
+                room_checkbox_label: `${checkboxBldgName} ${rawRoom}`, 
                 start_date_str: checkIn,
                 end_date_str: checkOut
             });
@@ -143,7 +144,6 @@ function processData(rows, confName) {
 
     document.getElementById('status').innerText = `Success! Loaded ${formattedCards.length} cards.`;
     
-    // Send the data directly to the Salto webpage!
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
         chrome.tabs.sendMessage(tabs[0].id, {
             action: "start_automation",
