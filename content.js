@@ -14,7 +14,7 @@ function simulateTyping(elementId, value) {
     }
 }
 
-// NEW: A custom HTML popup menu injected directly into the page!
+// A custom HTML popup menu injected directly into the page
 function promptUserAction(messageText) {
     return new Promise((resolve) => {
         // Create the dark background overlay
@@ -39,19 +39,19 @@ function promptUserAction(messageText) {
 
         // 1. Encode Button
         let btnEncode = document.createElement('button');
-        btnEncode.innerText = "✅ Encode Card";
+        btnEncode.innerText = "Encode Card";
         btnEncode.style.cssText = baseBtnStyle + " background-color: #4CAF50;";
         btnEncode.onclick = () => { document.body.removeChild(overlay); resolve('encode'); };
 
         // 2. Skip Button
         let btnSkip = document.createElement('button');
-        btnSkip.innerText = "⏭️ Skip Card";
+        btnSkip.innerText = "Skip Card";
         btnSkip.style.cssText = baseBtnStyle + " background-color: #FF9800;";
         btnSkip.onclick = () => { document.body.removeChild(overlay); resolve('skip'); };
 
         // 3. Stop Button
         let btnStop = document.createElement('button');
-        btnStop.innerText = "🛑 Stop";
+        btnStop.innerText = "Stop";
         btnStop.style.cssText = baseBtnStyle + " background-color: #F44336;";
         btnStop.onclick = () => { document.body.removeChild(overlay); resolve('stop'); };
 
@@ -121,7 +121,7 @@ async function runSaltoAutomation(cardsList) {
 
         await new Promise(r => setTimeout(r, 1000)); 
 
-        // --- NEW: THE CHECKBOX SWEEPER ---
+        // THE CHECKBOX SWEEPER 
         // Find every single checkbox that is currently checked, and forcefully turn it off
         let allCheckedBoxes = document.querySelectorAll("input[type='checkbox']:checked");
         for (let oldBox of allCheckedBoxes) {
@@ -130,7 +130,7 @@ async function runSaltoAutomation(cardsList) {
             oldBox.dispatchEvent(new Event('change', { bubbles: true }));
         }
         
-        // Wait a tiny moment for Angular to register the unchecking
+        // Wait a moment for Angular to register the unchecking
         await new Promise(r => setTimeout(r, 300)); 
         // ---------------------------------
 
