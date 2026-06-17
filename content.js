@@ -14,15 +14,70 @@ function simulateTyping(elementId, value) {
     }
 }
 
+// NEW: A custom HTML popup menu injected directly into the page!
+function promptUserAction(messageText) {
+    return new Promise((resolve) => {
+        // Create the dark background overlay
+        let overlay = document.createElement('div');
+        overlay.style.cssText = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 999999; display: flex; align-items: center; justify-content: center;";
+
+        // Create the white menu box
+        let box = document.createElement('div');
+        box.style.cssText = "background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; min-width: 400px;";
+
+        // Add the message text
+        let msg = document.createElement('div');
+        msg.style.cssText = "margin-bottom: 25px; white-space: pre-wrap; font-size: 16px; color: #333; line-height: 1.5;";
+        msg.innerText = messageText;
+
+        // Container for the buttons
+        let btnContainer = document.createElement('div');
+        btnContainer.style.cssText = "display: flex; gap: 15px; justify-content: center;";
+
+        // Style template for buttons
+        let baseBtnStyle = "padding: 10px 20px; border: none; border-radius: 5px; font-size: 14px; font-weight: bold; cursor: pointer; color: white;";
+
+        // 1. Encode Button
+        let btnEncode = document.createElement('button');
+        btnEncode.innerText = "✅ Encode Card";
+        btnEncode.style.cssText = baseBtnStyle + " background-color: #4CAF50;";
+        btnEncode.onclick = () => { document.body.removeChild(overlay); resolve('encode'); };
+
+        // 2. Skip Button
+        let btnSkip = document.createElement('button');
+        btnSkip.innerText = "⏭️ Skip Card";
+        btnSkip.style.cssText = baseBtnStyle + " background-color: #FF9800;";
+        btnSkip.onclick = () => { document.body.removeChild(overlay); resolve('skip'); };
+
+        // 3. Stop Button
+        let btnStop = document.createElement('button');
+        btnStop.innerText = "🛑 Stop";
+        btnStop.style.cssText = baseBtnStyle + " background-color: #F44336;";
+        btnStop.onclick = () => { document.body.removeChild(overlay); resolve('stop'); };
+
+        // Put it all together
+        btnContainer.appendChild(btnEncode);
+        btnContainer.appendChild(btnSkip);
+        btnContainer.appendChild(btnStop);
+        box.appendChild(msg);
+        box.appendChild(btnContainer);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+    });
+}
+
 async function runSaltoAutomation(cardsList) {
     for (let i = 0; i < cardsList.length; i++) {
         let card = cardsList[i];
         
-        let proceed = confirm(`Card ${i + 1} of ${cardsList.length}\n\n👉 PLACE card on encoder for:\n${card.full_string}\n\nClick OK to encode, or Cancel to stop entirely.`);
+        // Wait for the user to click one of our custom buttons
+        let action = await promptUserAction(`Card ${i + 1} of ${cardsList.length}\n\n👉 PLACE card on encoder for:\n${card.full_string}`);
         
-        if (!proceed) {
+        if (action === 'stop') {
             alert("Automation stopped by user.");
-            break;
+            break; // Exits the entire loop
+        } else if (action === 'skip') {
+            continue; // Skips the rest of this code and instantly jumps to the next card!
         }
 
         // 1. Fill Name
@@ -66,26 +121,36 @@ async function runSaltoAutomation(cardsList) {
 
         await new Promise(r => setTimeout(r, 1000)); 
 
-        // 4. Click Room Checkbox (FULL HUMAN SIMULATION)
+        // --- NEW: THE CHECKBOX SWEEPER ---
+        // Find every single checkbox that is currently checked, and forcefully turn it off
+        let allCheckedBoxes = document.querySelectorAll("input[type='checkbox']:checked");
+        for (let oldBox of allCheckedBoxes) {
+            oldBox.checked = false;
+            oldBox.dispatchEvent(new Event('input', { bubbles: true }));
+            oldBox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // Wait a tiny moment for Angular to register the unchecking
+        await new Promise(r => setTimeout(r, 300)); 
+        // ---------------------------------
+
+        // 4. Click Room Checkbox
         let labels = document.querySelectorAll("label.field__label--radiocheck");
         let foundBox = false;
 
         for (let label of labels) {
-            // Clean up any hidden spaces or line breaks in the HTML text
             let labelText = label.textContent.replace(/\s+/g, ' ').trim();
             
             if (labelText === card.room_checkbox_label || labelText.includes(card.room_checkbox_label)) {
                 foundBox = true;
-                
-                // Scroll to center
                 label.scrollIntoView({ behavior: "smooth", block: "center" });
                 
-                // Strategy A: Click the label like a human mouse
+                // Strategy A
                 label.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
                 label.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
                 label.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
 
-                // Strategy B: Click the parent <li> which holds the Angular ng-click event
+                // Strategy B
                 let parentLi = label.closest('li');
                 if (parentLi) {
                     parentLi.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
@@ -93,7 +158,7 @@ async function runSaltoAutomation(cardsList) {
                     parentLi.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
                 }
 
-                // Strategy C: Brute-force the hidden input
+                // Strategy C
                 let checkboxId = label.getAttribute("for");
                 if (checkboxId) {
                     let checkbox = document.getElementById(checkboxId);
@@ -107,12 +172,10 @@ async function runSaltoAutomation(cardsList) {
             }
         }
 
-        // Debugging trap: If it failed to find the text, it will print an error to the F12 Console
         if (!foundBox) {
-            console.error(`❌ CRITICAL ERROR: Could not find any label matching "${card.room_checkbox_label}". The text on the screen does not match what the script is looking for!`);
+            console.error(`❌ CRITICAL ERROR: Could not find any label matching "${card.room_checkbox_label}".`);
         }
 
-        // Wait 1 second before submitting
         await new Promise(r => setTimeout(r, 1000)); 
 
         // 5. Submit
@@ -122,7 +185,7 @@ async function runSaltoAutomation(cardsList) {
         }
 
         // Wait for the encoder to finish before moving to next card
-        await new Promise(r => setTimeout(r, 3500));
+        await new Promise(r => setTimeout(r, 4500));
     }
     
     alert("Batch Complete!");
