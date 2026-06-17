@@ -19,7 +19,6 @@ async function runSaltoAutomation(cardsList) {
     for (let i = 0; i < cardsList.length; i++) {
         let card = cardsList[i];
         
-        // This replaces the Tkinter popup! Native browser alerts pause the script perfectly.
         let proceed = confirm(`Card ${i + 1} of ${cardsList.length}\n\n👉 PLACE card on encoder for:\n${card.full_string}\n\nClick OK to encode, or Cancel to stop entirely.`);
         
         if (!proceed) {
@@ -34,32 +33,48 @@ async function runSaltoAutomation(cardsList) {
         simulateTyping("fullpicker-date-activation", card.start_date_str);
         simulateTyping("fullpicker-date-expiration", card.end_date_str);
 
-        // 3. Dropdown Logic
-        // Because Select2 dropdowns require a click to open, we simulate it
+        // 3. Dropdown Logic (THE FIX)
+        // Select2 frameworks often ignore standard clicks. We must dispatch a 'mousedown' to force it open.
         let dropdown = document.getElementById("select2-visitor-access-level-container");
+        
         if (dropdown) {
-            dropdown.click(); // Open the menu
+            dropdown.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
             
-            // Wait 500ms for animation, then find and click the target floor
-            await new Promise(r => setTimeout(r, 500)); 
-            let options = document.querySelectorAll("li.select2-results__option");
-            for (let opt of options) {
-                if (opt.innerText.includes(card.access_level_search)) {
-                    opt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-                    break;
+            // Wait for the opening animation and for the search box to appear in the HTML
+            await new Promise(r => setTimeout(r, 600)); 
+            
+            // Find the exact search box from your screenshot
+            let searchBox = document.querySelector("input.select2-search__field");
+            if (searchBox) {
+                // Type our specific floor search string into it
+                searchBox.value = card.access_level_search;
+                searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                // Wait for Salto to filter the results based on our typing
+                await new Promise(r => setTimeout(r, 600)); 
+                
+                // Now find the visible result and trigger a 'mouseup' to select it
+                let options = document.querySelectorAll("li.select2-results__option");
+                for (let opt of options) {
+                    if (opt.innerText.includes(card.access_level_search)) {
+                        opt.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                        break;
+                    }
                 }
             }
-            await new Promise(r => setTimeout(r, 500)); // Wait to close
         }
 
+        // Wait half a second for the dropdown menu to fully close before moving on
+        await new Promise(r => setTimeout(r, 500)); 
+
         // 4. Click Room Checkbox
-        // We find all field elements, look for the text match, and click the checkbox inside
         let fields = document.querySelectorAll("field");
         for (let field of fields) {
             if (field.innerText.includes(card.room_checkbox_label)) {
                 let checkbox = field.querySelector("input[type='checkbox']");
                 if (checkbox && !checkbox.checked) {
                     checkbox.click();
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
                 }
                 break;
             }
@@ -71,7 +86,7 @@ async function runSaltoAutomation(cardsList) {
             submitBtn.click();
         }
 
-        // Wait a few seconds for the encoder to finish before looping to the next card
+        // Wait 3.5 seconds for the encoder to finish before looping to the next card
         await new Promise(r => setTimeout(r, 3500));
     }
     
