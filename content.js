@@ -71,7 +71,7 @@ async function runSaltoAutomation(cardsList) {
         let card = cardsList[i];
         
         // Wait for the user to click one of our custom buttons
-        let action = await promptUserAction(`Card ${i + 1} of ${cardsList.length}\n\n👉 PLACE card on encoder for:\n${card.full_string}`);
+        let action = await promptUserAction(`Card ${i + 1} of ${cardsList.length}\n\n PLACE card on encoder for:\n${card.full_string}`);
         
         if (action === 'stop') {
             alert("Automation stopped by user.");
