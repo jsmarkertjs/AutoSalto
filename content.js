@@ -34,26 +34,33 @@ async function runSaltoAutomation(cardsList) {
         simulateTyping("fullpicker-date-expiration", card.end_date_str);
 
         // 3. Dropdown Logic (THE FIX)
-        // Select2 frameworks often ignore standard clicks. We must dispatch a 'mousedown' to force it open.
         let dropdown = document.getElementById("select2-visitor-access-level-container");
         
         if (dropdown) {
+            // Force the dropdown open
             dropdown.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
             
-            // Wait for the opening animation and for the search box to appear in the HTML
             await new Promise(r => setTimeout(r, 600)); 
             
-            // Find the exact search box from your screenshot
             let searchBox = document.querySelector("input.select2-search__field");
             if (searchBox) {
-                // Type our specific floor search string into it
+                // Type the string
                 searchBox.value = card.access_level_search;
                 searchBox.dispatchEvent(new Event('input', { bubbles: true }));
                 
-                // Wait for Salto to filter the results based on our typing
                 await new Promise(r => setTimeout(r, 600)); 
                 
-                // Now find the visible result and trigger a 'mouseup' to select it
+                // NEW: Simulate hitting the "Enter" key!
+                let enterDown = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13 });
+                let enterUp = new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', keyCode: 13 });
+                
+                searchBox.dispatchEvent(enterDown);
+                searchBox.dispatchEvent(enterUp);
+
+                // Wait for the backend to hear the 'Enter' key and load the Optional Facilities checkboxes
+                await new Promise(r => setTimeout(r, 800)); 
+                
+                // Fallback: Just in case the Enter key didn't physically click the item, we click it too
                 let options = document.querySelectorAll("li.select2-results__option");
                 for (let opt of options) {
                     if (opt.innerText.includes(card.access_level_search)) {
@@ -64,8 +71,8 @@ async function runSaltoAutomation(cardsList) {
             }
         }
 
-        // Wait half a second for the dropdown menu to fully close before moving on
-        await new Promise(r => setTimeout(r, 500)); 
+        // Wait another moment to ensure the Optional Facilities are fully rendered on the screen
+        await new Promise(r => setTimeout(r, 800)); 
 
         // 4. Click Room Checkbox
         let fields = document.querySelectorAll("field");
