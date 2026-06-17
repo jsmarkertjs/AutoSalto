@@ -1,15 +1,53 @@
-// Hardcoded mappings (Translated from your Python logic)
-const buildingMap = {
-    "AND": "Anderson Hall", "CSSL": "Cassell Hall", "CENT": "Centennial Hall",
-    "CLRK": "Clark Hall", "CNST": "Constitution Hall", "DBR": "Duber Hall",
-    "FDRL": "Federal Hall", "HUGH": "Hughes Hall", "LEO": "Leonard Hall",
-    "LETT": "Letts Hall", "MCD": "McDowell Hall", "NEB": "Nebraska Hall"
-};
-
+// Function to add st, nd, rd, th to floor numbers
 function getOrdinal(n) {
     let s = ["th", "st", "nd", "rd"];
     let v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// Function to force MM-DD-YYYY format
+function formatDate(dateInput) {
+    if (!dateInput) return "";
+    let d = new Date(dateInput);
+    if (isNaN(d.getTime())) return dateInput; // Fallback to original if parsing fails
+
+    let mm = String(d.getMonth() + 1).padStart(2, '0');
+    let dd = String(d.getDate()).padStart(2, '0');
+    let yyyy = d.getFullYear();
+    
+    return `${mm}-${dd}-${yyyy}`;
+}
+
+// Function to route exact building formatting
+function getAccessLevelSearch(bldgAbbr, floorDigit, roomSuffixInt) {
+    let floorOrdinal = getOrdinal(parseInt(floorDigit));
+    let bldgUpper = bldgAbbr.toUpperCase();
+
+    switch(bldgUpper) {
+        case "AND":
+            if (roomSuffixInt >= 21 && roomSuffixInt <= 58) {
+                return `Anderson Hall ${floorOrdinal} Floor North`;
+            } else {
+                return `Anderson Hall ${floorOrdinal} Floor South`;
+            }
+        case "LETT":
+            if (roomSuffixInt >= 25 && roomSuffixInt <= 48) {
+                return `Letts Hall - ${floorOrdinal} Floor South`;
+            } else {
+                return `Letts Hall - ${floorOrdinal} Floor North`;
+            }
+        case "CSSL": return `Cassell Hall ${floorDigit}`;
+        case "CENT": return `Centennial Hall ${floorDigit}`;
+        case "CLRK": return `Clark Hall ${floorDigit}`;
+        case "CNST": return `Constitution ${floorDigit}`;
+        case "DBR":  return `Duber ${floorDigit}`;
+        case "FDRL": return `Federal ${floorDigit}`;
+        case "HUGH": return `Hughes Hall ${floorDigit}`;
+        case "LEO":  return `Leonard Hall ${floorDigit}`;
+        case "MCD":  return `McDowell Hall ${floorDigit}`;
+        default:
+            return `${bldgUpper} ${floorDigit}`; // Fallback if building isn't mapped
+    }
 }
 
 // Attach listener to the Start Button
@@ -40,7 +78,8 @@ document.getElementById('startBtn').addEventListener('click', () => {
             parsedRows = results.data;
             processData(parsedRows, confName);
         } else if (file.name.endsWith('.xlsx')) {
-            const workbook = XLSX.read(data, { type: 'binary' });
+            // Added cellDates: true so Excel reads dates correctly instead of as serial numbers
+            const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
             const firstSheet = workbook.SheetNames[0];
             parsedRows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
             processData(parsedRows, confName);
@@ -62,8 +101,10 @@ function processData(rows, confName) {
         let last = row['Entry Name Last'] || "";
         let roomDesc = row['Entry Summary Room Space Description'] || "";
         let cardNum = row['Entry Guest Card #'] || "";
-        let checkIn = row['Booking Check In Date'] || "";
-        let checkOut = row['Booking Check Out Date'] || "";
+        
+        // Format Dates to MM-DD-YYYY immediately 
+        let checkIn = formatDate(row['Booking Check In Date']);
+        let checkOut = formatDate(row['Booking Check Out Date']);
 
         // Skip empties or numeric-only names
         if (!first || !isNaN(first)) return;
@@ -73,14 +114,16 @@ function processData(rows, confName) {
         if (match) {
             let bldgAbbr = match[1].toUpperCase();
             let rawRoom = match[2];
-            let fullBldgName = buildingMap[bldgAbbr] || bldgAbbr;
 
-            // Floor math
+            // Math to split the floor from the room suffix (e.g. 421 -> Floor 4, Room 21)
             let floorDigit = rawRoom.length > 2 ? rawRoom.substring(0, rawRoom.length - 2) : "1";
-            let floorString = getOrdinal(parseInt(floorDigit)) + " Floor";
-            let accessLevelSearch = `${fullBldgName} ${floorString}`;
+            let roomSuffixStr = rawRoom.length > 2 ? rawRoom.substring(rawRoom.length - 2) : rawRoom;
+            let roomSuffixInt = parseInt(roomSuffixStr, 10);
 
-            // Build the final string
+            // Get the exact dropdown string using our new router
+            let accessLevelSearch = getAccessLevelSearch(bldgAbbr, floorDigit, roomSuffixInt);
+
+            // Build the final physical label string
             let fullString = `${cardNum}, ${first} ${last}, ${roomDesc}, ${confName}, ${checkIn}-${checkOut}`;
 
             formattedCards.push({
