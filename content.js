@@ -52,7 +52,6 @@ async function runSaltoAutomation(cardsList) {
                 searchBox.dispatchEvent(enterDown);
                 searchBox.dispatchEvent(enterUp);
 
-                // WAIT 2 FULL SECONDS for the Optional Facilities to load!
                 await new Promise(r => setTimeout(r, 2000)); 
                 
                 let options = document.querySelectorAll("li.select2-results__option");
@@ -65,39 +64,55 @@ async function runSaltoAutomation(cardsList) {
             }
         }
 
-        // Wait another moment to ensure the UI is fully settled
         await new Promise(r => setTimeout(r, 1000)); 
 
-        // 4. Click Room Checkbox (THE ANGULAR FIX)
+        // 4. Click Room Checkbox (FULL HUMAN SIMULATION)
         let labels = document.querySelectorAll("label.field__label--radiocheck");
-        
+        let foundBox = false;
+
         for (let label of labels) {
-            // Using textContent to avoid any invisible HTML formatting getting in the way
-            if (label.textContent.includes(card.room_checkbox_label)) {
+            // Clean up any hidden spaces or line breaks in the HTML text
+            let labelText = label.textContent.replace(/\s+/g, ' ').trim();
+            
+            if (labelText === card.room_checkbox_label || labelText.includes(card.room_checkbox_label)) {
+                foundBox = true;
                 
-                // Read the secret ID link
+                // Scroll to center
+                label.scrollIntoView({ behavior: "smooth", block: "center" });
+                
+                // Strategy A: Click the label like a human mouse
+                label.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                label.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                label.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
+                // Strategy B: Click the parent <li> which holds the Angular ng-click event
+                let parentLi = label.closest('li');
+                if (parentLi) {
+                    parentLi.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                    parentLi.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                    parentLi.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                }
+
+                // Strategy C: Brute-force the hidden input
                 let checkboxId = label.getAttribute("for");
-                let checkbox = document.getElementById(checkboxId);
-                
-                if (checkbox) {
-                    // Scroll it into the center of the screen so Angular doesn't block off-screen clicks
-                    checkbox.scrollIntoView({ behavior: "smooth", block: "center" });
-                    
-                    if (!checkbox.checked) {
-                        checkbox.click();
-                        // Force Angular's ng-model to recognize the change
+                if (checkboxId) {
+                    let checkbox = document.getElementById(checkboxId);
+                    if (checkbox && !checkbox.checked) {
+                        checkbox.checked = true;
+                        checkbox.dispatchEvent(new Event('input', { bubbles: true }));
                         checkbox.dispatchEvent(new Event('change', { bubbles: true }));
                     }
-                } else {
-                    // Fallback just in case
-                    label.scrollIntoView({ behavior: "smooth", block: "center" });
-                    label.click();
                 }
                 break;
             }
         }
 
-        // Wait 1 second before submitting to let Angular catch up
+        // Debugging trap: If it failed to find the text, it will print an error to the F12 Console
+        if (!foundBox) {
+            console.error(`❌ CRITICAL ERROR: Could not find any label matching "${card.room_checkbox_label}". The text on the screen does not match what the script is looking for!`);
+        }
+
+        // Wait 1 second before submitting
         await new Promise(r => setTimeout(r, 1000)); 
 
         // 5. Submit
@@ -106,7 +121,7 @@ async function runSaltoAutomation(cardsList) {
             submitBtn.click();
         }
 
-        // Wait 3.5 seconds for the encoder to finish before looping to the next card
+        // Wait for the encoder to finish before moving to next card
         await new Promise(r => setTimeout(r, 3500));
     }
     
