@@ -65,18 +65,40 @@ async function runSaltoAutomation(cardsList) {
             }
         }
 
-        // Wait another moment to ensure the UI is settled
+        // Wait another moment to ensure the UI is fully settled
         await new Promise(r => setTimeout(r, 1000)); 
 
-        // 4. Click Room Checkbox (THE FIX)
-        // Based on your screenshot, we search for the <label> that contains the room text and click it directly
+        // 4. Click Room Checkbox (THE ANGULAR FIX)
         let labels = document.querySelectorAll("label.field__label--radiocheck");
+        
         for (let label of labels) {
-            if (label.innerText.includes(card.room_checkbox_label)) {
-                label.click();
+            // Using textContent to avoid any invisible HTML formatting getting in the way
+            if (label.textContent.includes(card.room_checkbox_label)) {
+                
+                // Read the secret ID link
+                let checkboxId = label.getAttribute("for");
+                let checkbox = document.getElementById(checkboxId);
+                
+                if (checkbox) {
+                    // Scroll it into the center of the screen so Angular doesn't block off-screen clicks
+                    checkbox.scrollIntoView({ behavior: "smooth", block: "center" });
+                    
+                    if (!checkbox.checked) {
+                        checkbox.click();
+                        // Force Angular's ng-model to recognize the change
+                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                } else {
+                    // Fallback just in case
+                    label.scrollIntoView({ behavior: "smooth", block: "center" });
+                    label.click();
+                }
                 break;
             }
         }
+
+        // Wait 1 second before submitting to let Angular catch up
+        await new Promise(r => setTimeout(r, 1000)); 
 
         // 5. Submit
         let submitBtn = document.getElementById("submit-button");
