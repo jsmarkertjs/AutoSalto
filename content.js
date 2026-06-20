@@ -61,7 +61,6 @@ async function runSaltoAutomation(cardsList) {
     for (let i = 0; i < cardsList.length; i++) {
         let card = cardsList[i];
         
-        // Wait for the user to click one of our custom buttons
         let action = await promptUserAction(`Card ${i + 1} of ${cardsList.length}\n\n👉 PLACE card on encoder for:\n${card.full_string}`);
         
         if (action === 'stop') {
@@ -77,6 +76,27 @@ async function runSaltoAutomation(cardsList) {
         // 2. Fill Dates
         simulateTyping("fullpicker-date-activation", card.start_date_str);
         simulateTyping("fullpicker-date-expiration", card.end_date_str);
+
+        // --- 2.5 THE CHECKBOX SWEEPER (ANGULAR SAFE FIX) ---
+        // We must uncheck the previous card's room BEFORE we change the dropdown!
+        let allCheckedBoxes = document.querySelectorAll("input[type='checkbox']:checked");
+        for (let oldBox of allCheckedBoxes) {
+            let boxId = oldBox.getAttribute("id");
+            if (boxId) {
+                let labelToUncheck = document.querySelector(`label[for='${boxId}']`);
+                if (labelToUncheck) {
+                    labelToUncheck.scrollIntoView({ behavior: "smooth", block: "center" });
+                    
+                    // Use the human click simulation so Angular knows to drop it from memory
+                    labelToUncheck.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                    labelToUncheck.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                    labelToUncheck.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                }
+            }
+        }
+        // Give Angular half a second to process the unchecking
+        await new Promise(r => setTimeout(r, 500)); 
+        // ---------------------------------------------------
 
         // 3. Dropdown Logic
         let dropdown = document.getElementById("select2-visitor-access-level-container");
@@ -112,16 +132,6 @@ async function runSaltoAutomation(cardsList) {
 
         await new Promise(r => setTimeout(r, 1000)); 
 
-        // THE CHECKBOX SWEEPER
-        let allCheckedBoxes = document.querySelectorAll("input[type='checkbox']:checked");
-        for (let oldBox of allCheckedBoxes) {
-            oldBox.checked = false;
-            oldBox.dispatchEvent(new Event('input', { bubbles: true }));
-            oldBox.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        
-        await new Promise(r => setTimeout(r, 300)); 
-
         // 4. Click Room Checkbox
         let labels = document.querySelectorAll("label.field__label--radiocheck");
         let foundBox = false;
@@ -133,12 +143,10 @@ async function runSaltoAutomation(cardsList) {
                 foundBox = true;
                 label.scrollIntoView({ behavior: "smooth", block: "center" });
                 
-                // Strategy A
                 label.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
                 label.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
                 label.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
 
-                // Strategy B
                 let parentLi = label.closest('li');
                 if (parentLi) {
                     parentLi.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
@@ -146,7 +154,6 @@ async function runSaltoAutomation(cardsList) {
                     parentLi.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
                 }
 
-                // Strategy C
                 let checkboxId = label.getAttribute("for");
                 if (checkboxId) {
                     let checkbox = document.getElementById(checkboxId);
@@ -172,32 +179,28 @@ async function runSaltoAutomation(cardsList) {
             submitBtn.click();
         }
 
-        // --- NEW: THE SMART WAITER ---
-        let maxWaitTime = 20000; // Will wait a maximum of 20 seconds
-        let pollInterval = 500;  // Checks the screen every half-second
+        // 6. THE SMART WAITER
+        let maxWaitTime = 20000; 
+        let pollInterval = 500;  
         let timeWaited = 0;
         let successFound = false;
 
         while (timeWaited < maxWaitTime) {
-            // Search for all primary buttons on the screen
             let buttons = document.querySelectorAll("button.button-primary");
             
             for (let btn of buttons) {
-                // Check if the button contains the text "OK"
                 if (btn.textContent.trim() === "OK" || btn.innerText.includes("OK")) {
-                    btn.click(); // We found the success popup! Click it!
+                    btn.click(); 
                     successFound = true;
                     break;
                 }
             }
             
             if (successFound) {
-                // Wait just a brief moment for the modal animation to visually close
                 await new Promise(r => setTimeout(r, 500));
                 break; 
             }
 
-            // If we didn't find it, wait half a second and loop back to check again
             await new Promise(r => setTimeout(r, pollInterval));
             timeWaited += pollInterval;
         }
@@ -205,7 +208,6 @@ async function runSaltoAutomation(cardsList) {
         if (!successFound) {
             console.warn("⚠️ Timed out waiting for the 'Operation completed successfully' popup. Moving to the next card anyway.");
         }
-        // -----------------------------
     }
     
     alert("Batch Complete!");
