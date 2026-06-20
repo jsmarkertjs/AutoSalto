@@ -14,48 +14,39 @@ function simulateTyping(elementId, value) {
     }
 }
 
-// A custom HTML popup menu injected directly into the page
+// A custom HTML popup menu injected directly into the page!
 function promptUserAction(messageText) {
     return new Promise((resolve) => {
-        // Create the dark background overlay
         let overlay = document.createElement('div');
         overlay.style.cssText = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 999999; display: flex; align-items: center; justify-content: center;";
 
-        // Create the white menu box
         let box = document.createElement('div');
         box.style.cssText = "background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; min-width: 400px;";
 
-        // Add the message text
         let msg = document.createElement('div');
         msg.style.cssText = "margin-bottom: 25px; white-space: pre-wrap; font-size: 16px; color: #333; line-height: 1.5;";
         msg.innerText = messageText;
 
-        // Container for the buttons
         let btnContainer = document.createElement('div');
         btnContainer.style.cssText = "display: flex; gap: 15px; justify-content: center;";
 
-        // Style template for buttons
         let baseBtnStyle = "padding: 10px 20px; border: none; border-radius: 5px; font-size: 14px; font-weight: bold; cursor: pointer; color: white;";
 
-        // 1. Encode Button
         let btnEncode = document.createElement('button');
-        btnEncode.innerText = "Encode Card";
+        btnEncode.innerText = "✅ Encode Card";
         btnEncode.style.cssText = baseBtnStyle + " background-color: #4CAF50;";
         btnEncode.onclick = () => { document.body.removeChild(overlay); resolve('encode'); };
 
-        // 2. Skip Button
         let btnSkip = document.createElement('button');
-        btnSkip.innerText = "Skip Card";
+        btnSkip.innerText = "⏭️ Skip Card";
         btnSkip.style.cssText = baseBtnStyle + " background-color: #FF9800;";
         btnSkip.onclick = () => { document.body.removeChild(overlay); resolve('skip'); };
 
-        // 3. Stop Button
         let btnStop = document.createElement('button');
-        btnStop.innerText = "Stop";
+        btnStop.innerText = "🛑 Stop";
         btnStop.style.cssText = baseBtnStyle + " background-color: #F44336;";
         btnStop.onclick = () => { document.body.removeChild(overlay); resolve('stop'); };
 
-        // Put it all together
         btnContainer.appendChild(btnEncode);
         btnContainer.appendChild(btnSkip);
         btnContainer.appendChild(btnStop);
@@ -71,13 +62,13 @@ async function runSaltoAutomation(cardsList) {
         let card = cardsList[i];
         
         // Wait for the user to click one of our custom buttons
-        let action = await promptUserAction(`Card ${i + 1} of ${cardsList.length}\n\n PLACE card on encoder for:\n${card.full_string}`);
+        let action = await promptUserAction(`Card ${i + 1} of ${cardsList.length}\n\n👉 PLACE card on encoder for:\n${card.full_string}`);
         
         if (action === 'stop') {
             alert("Automation stopped by user.");
-            break; // Exits the entire loop
+            break; 
         } else if (action === 'skip') {
-            continue; // Skips the rest of this code and instantly jumps to the next card!
+            continue; 
         }
 
         // 1. Fill Name
@@ -121,8 +112,7 @@ async function runSaltoAutomation(cardsList) {
 
         await new Promise(r => setTimeout(r, 1000)); 
 
-        // THE CHECKBOX SWEEPER 
-        // Find every single checkbox that is currently checked, and forcefully turn it off
+        // THE CHECKBOX SWEEPER
         let allCheckedBoxes = document.querySelectorAll("input[type='checkbox']:checked");
         for (let oldBox of allCheckedBoxes) {
             oldBox.checked = false;
@@ -130,9 +120,7 @@ async function runSaltoAutomation(cardsList) {
             oldBox.dispatchEvent(new Event('change', { bubbles: true }));
         }
         
-        // Wait a moment for Angular to register the unchecking
         await new Promise(r => setTimeout(r, 300)); 
-        // ---------------------------------
 
         // 4. Click Room Checkbox
         let labels = document.querySelectorAll("label.field__label--radiocheck");
@@ -184,8 +172,40 @@ async function runSaltoAutomation(cardsList) {
             submitBtn.click();
         }
 
-        // Wait for the encoder to finish before moving to next card
-        await new Promise(r => setTimeout(r, 4500));
+        // --- NEW: THE SMART WAITER ---
+        let maxWaitTime = 20000; // Will wait a maximum of 20 seconds
+        let pollInterval = 500;  // Checks the screen every half-second
+        let timeWaited = 0;
+        let successFound = false;
+
+        while (timeWaited < maxWaitTime) {
+            // Search for all primary buttons on the screen
+            let buttons = document.querySelectorAll("button.button-primary");
+            
+            for (let btn of buttons) {
+                // Check if the button contains the text "OK"
+                if (btn.textContent.trim() === "OK" || btn.innerText.includes("OK")) {
+                    btn.click(); // We found the success popup! Click it!
+                    successFound = true;
+                    break;
+                }
+            }
+            
+            if (successFound) {
+                // Wait just a brief moment for the modal animation to visually close
+                await new Promise(r => setTimeout(r, 500));
+                break; 
+            }
+
+            // If we didn't find it, wait half a second and loop back to check again
+            await new Promise(r => setTimeout(r, pollInterval));
+            timeWaited += pollInterval;
+        }
+
+        if (!successFound) {
+            console.warn("⚠️ Timed out waiting for the 'Operation completed successfully' popup. Moving to the next card anyway.");
+        }
+        // -----------------------------
     }
     
     alert("Batch Complete!");
