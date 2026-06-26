@@ -24,7 +24,7 @@ function getAccessLevelSearch(bldgAbbr, floorDigit, roomSuffixInt) {
     let bldgUpper = bldgAbbr.toUpperCase();
 
     switch(bldgUpper) {
-        case "AND": return roomSuffixInt >= 21 && roomSuffixInt <= 58 ? `Anderson Hall ${floorOrdinal} Floor North` : `Anderson Hall ${floorOrdinal} Floor South`;
+        case "AND": return roomSuffixInt >= 1 && roomSuffixInt <= 38 ? `Anderson Hall ${floorOrdinal} Floor South` : `Anderson Hall ${floorOrdinal} Floor North`;
         case "LETT": return roomSuffixInt >= 25 && roomSuffixInt <= 48 ? `Letts Hall - ${floorOrdinal} Floor South` : `Letts Hall - ${floorOrdinal} Floor North`;
         case "CSSL": return `Cassell Hall ${floorDigit}`;
         case "CENT": return `Centennial Hall ${floorDigit}`;
